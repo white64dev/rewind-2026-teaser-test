@@ -228,8 +228,10 @@ class Flip {
     this.back.material.map = cardTex(next, this.w, this.h);
     [this.topS, this.botS, this.front, this.back].forEach(m => m.material.needsUpdate = true);
   }
-  push(vals) { this.queue.push(...vals); this.g.visible = true; }
+  push(vals, wait = 0) { this.queue.push(...vals); this.wait = wait; this.g.visible = true; }
+  show(val) { this.cur = val; this.queue = []; this.t = 1; this.leaf.rotation.x = 0; this.set(val, val); this.g.visible = val !== this.final; }
   tick(dt) {
+    if (this.wait > 0) { this.wait -= dt; return; }
     if (this.t >= 1) {
       if (!this.queue.length) { if (this.cur === this.final) this.g.visible = false; return; }   // at rest the photo shows again
       this.next = this.queue.shift(); this.set(this.cur, this.next); this.t = 0; window.tick?.();
@@ -248,13 +250,27 @@ const units = [
   new Flip(1070.1, 76.7, CARD_H, '15'),
   new Flip(1184.8, 120.7, CARD_H, '2027'),
 ];
+{ const n = new Date(); units[0].show(MONTHS[n.getMonth()]); units[1].show(String(n.getDate()).padStart(2, '0')); units[2].show(String(n.getFullYear())); }   // today, until the flip starts
+// on load the clock shows the visitor's today and flips to launch day, JAN 15 2027.
+// Long gaps are sampled so each card turns at most a handful of times (~2s total, whatever the date).
+const LAUNCH = new Date(2027, 0, 15);
+function hops(from, to, max) {                         // evenly spaced values from→to (excluding from, ending on to)
+  const n = Math.abs(to - from); if (!n) return [];
+  const k = Math.min(n, max), out = [];
+  for (let i = 1; i <= k; i++) out.push(Math.round(from + (to - from) * i / k));
+  return out;
+}
 function spin() {
-  const r = (a, n) => Array.from({ length: n }, () => a[Math.floor(Math.random() * a.length)]);
-  const days = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
-  const yrs = ['1976','1983','1991','2001','2014','2020','2026'];
-  units[0].push([...r(MONTHS, 7), 'JAN']);
-  units[1].push([...r(days, 10), '15']);
-  units[2].push([...r(yrs, 13), '2027']);
+  const now = new Date(), dir = now < LAUNCH ? 1 : -1;
+  const m0 = now.getMonth(), d0 = now.getDate(), y0 = now.getFullYear();
+  units[0].show(MONTHS[m0]); units[1].show(String(d0).padStart(2, '0')); units[2].show(String(y0));
+  // months walk the calendar in the direction of travel, wrapping at the year
+  let mi = m0; const months = [];
+  while (mi !== 0 || (dir < 0 && months.length === 0 && m0 !== 0)) { mi = (mi + dir + 12) % 12; months.push(mi); if (months.length > 12) break; }
+  const ms = months.length > 7 ? hops(0, months.length - 1, 7).map(i => months[i]) : months;
+  units[2].push(hops(y0, 2027, 5).map(String), 0);
+  units[1].push(hops(d0, 15, 8).map(v => String(v).padStart(2, '0')), .25);
+  units[0].push(ms.map(i => MONTHS[i]), .12);
 }
 function wallCopy() {}                                                     // the comp's own subheader is a wall sprite now
 
@@ -340,7 +356,7 @@ const steamMat = (seed, scale, speed, op) => new THREE.ShaderMaterial({
       gl_FragColor = vec4(vec3(1., .985, .96), wisps * fall * flick * uOp * uOn);
       #include <colorspace_fragment>
     }` });
-const steam = [ [ 7.1, 1.1, .9, .5, 260, 30 ], [ 2.3, 1.6, .7, .34, 360, 75 ] ].map(([seed, sc, sp, op, size, z]) => {
+const steam = [ [ 7.1, 1.1, .5, .28, 130, 30 ], [ 2.3, 1.6, .4, .18, 180, 75 ] ].map(([seed, sc, sp, op, size, z]) => {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), steamMat(seed, sc, sp, op));
   m.position.set(STEAM_C.x, STEAM_C.y, z); m.userData.z = z; m.renderOrder = 400; desk.add(m); return m;
 });
