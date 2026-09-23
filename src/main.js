@@ -548,7 +548,7 @@ canvas.addEventListener('pointermove', ev => {
 addEventListener('keydown', ev => { if (modalOpen || ev.target.closest?.('input,textarea,select')) return; if (ev.key === 'ArrowDown' || ev.key === 'PageDown') { ev.preventDefault(); goTo(1); } if (ev.key === 'ArrowUp' || ev.key === 'PageUp') { ev.preventDefault(); goTo(0); } });
 const tog = (id, k) => { const b = document.getElementById(id); b.addEventListener('click', () => { S[k] = S[k] ? 0 : 1; b.setAttribute('aria-pressed', !!S[k]); }); };
 
-const back = document.getElementById('back'), hint = document.getElementById('hint'), wallcard = document.getElementById('wallcard');
+const back = document.getElementById('back'), wallcard = document.getElementById('wallcard');
 document.getElementById('scrollDown').addEventListener('click', () => goTo(1));
 back.addEventListener('click', () => goTo(0));
 
@@ -633,7 +633,6 @@ function frame() {
   back.classList.toggle('show', viewT > .95);
   for (const m of steam) { m.material.uniforms.uOn.value = THREE.MathUtils.smoothstep(viewT, .6, 1); m.position.z = m.userData.z * THREE.MathUtils.smoothstep(viewT, .35, .95); }
   wallcard.classList.toggle('gone', viewT > .06);
-  hint.style.opacity = viewT > .03 ? 0 : 1;
   renderer.setRenderTarget(rt); renderer.render(scene, camera);
   renderer.setRenderTarget(null); renderer.render(postScene, postCam);
   requestAnimationFrame(frame);
