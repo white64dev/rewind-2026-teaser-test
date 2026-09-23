@@ -315,6 +315,35 @@ const beam = new THREE.Mesh(new THREE.PlaneGeometry(3200, 1500), new THREE.Shade
       #include <colorspace_fragment>
     }` }));
 beam.position.set(FRAME_W / 2, -FRAME_H / 2, 0); beam.renderOrder = tw.renderOrder - 1.5; desk.add(beam);   // under the typewriter and its sheet: they stay the hero                             // “Be Part of Metro Rewind” sheet in the typewriter
+/* coffee steam: two soft, curling wisp layers rising off the cup toward the camera */
+const STEAM_C = W(1068, 596, 0);
+const steamMat = (seed, scale, speed, op) => new THREE.ShaderMaterial({
+  transparent: true, depthTest: false, depthWrite: false,
+  uniforms: { uTime: wallU.uTime, uSeed: { value: seed }, uScale: { value: scale }, uSpeed: { value: speed }, uOp: { value: op }, uOn: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+  fragmentShader: `uniform float uTime, uSeed, uScale, uSpeed, uOp, uOn; varying vec2 vUv;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f);
+      return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }
+    float fbm(vec2 p){ float v = 0., a = .5; for (int i = 0; i < 5; i++) { v += a * n(p); p = p * 2.03 + 1.7; a *= .5; } return v; }
+    void main(){
+      vec2 p = (vUv - .5) * 2.;                                   // -1..1 around the cup
+      float t = uTime * uSpeed + uSeed;
+      p += vec2(.18, .28) * (length(p) * .8);                     // plume leans with a faint room draft
+      float r = length(p), ang = atan(p.y, p.x);
+      vec2 q = vec2(ang * 1.2 + sin(t * .3) * .6, r * 2.6 - t * .55);   // rings travel outward = rising toward us
+      vec2 w = vec2(fbm(q * uScale + t * .12), fbm(q * uScale - t * .1 + 4.3));
+      float d = fbm(q * uScale * 1.3 + w * 2.2 + vec2(0., -t * .35));
+      float wisps = smoothstep(.48, .78, d);
+      float fall = smoothstep(1., .25, r) * smoothstep(.02, .22, r);     // born over the coffee, gone before the rim of the quad
+      float flick = .8 + .2 * sin(t * 1.7 + ang * 3.);
+      gl_FragColor = vec4(vec3(1., .985, .96), wisps * fall * flick * uOp * uOn);
+      #include <colorspace_fragment>
+    }` });
+const steam = [ [ 7.1, 1.1, .9, .5, 260, 30 ], [ 2.3, 1.6, .7, .34, 360, 75 ] ].map(([seed, sc, sp, op, size, z]) => {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), steamMat(seed, sc, sp, op));
+  m.position.set(STEAM_C.x, STEAM_C.y, z); m.userData.z = z; m.renderOrder = 400; desk.add(m); return m;
+});
 /* typing: the sheet feeds up out of the platen, the carriage steps left one letter at a time, returns, feeds a line */
 const TY = (() => {
   const e = copy.userData, L = e.lines, xT = e.x + e.w / 2;
@@ -586,6 +615,7 @@ function frame() {
   lampLevel += ((lampOn ? flickOn : 0) - lampLevel) * (t < flickUntil ? 1 : 1 - Math.pow(.0001, dt));
   common.uAmb.value = .76 + .21 * lampLevel;
   back.classList.toggle('show', viewT > .95);
+  for (const m of steam) { m.material.uniforms.uOn.value = THREE.MathUtils.smoothstep(viewT, .6, 1); m.position.z = m.userData.z * THREE.MathUtils.smoothstep(viewT, .35, .95); }
   wallcard.classList.toggle('gone', viewT > .06);
   hint.style.opacity = viewT > .03 ? 0 : 1;
   renderer.setRenderTarget(rt); renderer.render(scene, camera);
