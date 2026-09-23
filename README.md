@@ -11,9 +11,7 @@ npm run build     # production build → dist/
 npm run preview   # serve dist/
 ```
 
-## Deploy (Vercel)
-
-Import the GitHub repo in Vercel. `vercel.json` sets the Vite build and `dist/` output, and adds a `noindex` header because this is a client prototype.
+ 
 
 ## How it works
 
