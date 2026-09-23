@@ -1,0 +1,18 @@
+{
+  "name": "mtro-18796-teaser3d",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Metro Rewind teaser prototype — wall-to-desk cube transition in Three.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "vite": "^6.3.0"
+  }
+}
