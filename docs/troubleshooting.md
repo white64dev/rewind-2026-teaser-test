@@ -103,6 +103,16 @@ Entry format:
   one-sprite change, rebuild that sprite alone. Check `git status` on
   `public/assets/` afterwards.
 
+### A file copied back from the cloud arrived as its old version
+- **Area:** tooling
+- **Cause:** a file was re-sent to the Mac from the same cloud path as an
+  earlier copy, and the earlier version was written instead of the new one.
+  Suspected caching by path.
+- **Fix:** send it again from a new path, then grep the file on the Mac for
+  a line that only the new version has.
+- **Prevent:** use a new path for each re-send, and verify on the Mac before
+  committing ("nothing to commit" is the warning sign).
+
 ## Git and GitHub
 
 ### Git breaks inside the mounted folder (`index.lock`, garbage objects)
