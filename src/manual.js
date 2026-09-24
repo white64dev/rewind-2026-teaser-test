@@ -18,12 +18,12 @@ window.openManual = async () => {
 };
 function close() {
   if (root.hidden || busy) return;
-  busy = true; root.classList.remove('on');
+  busy = true;
   book.close(() => {
     root.hidden = true; document.body.style.overflow = ''; setInert(false); busy = false;
     dispatchEvent(new CustomEvent('manual', { detail: false }));
     lastFocus?.focus?.();
-  });
+  }, window.__manualRect?.(), () => root.classList.remove('on'));
 }
 root.addEventListener('click', ev => { if (ev.target.closest('[data-bclose]')) close(); });
 prevB.addEventListener('click', () => book?.prev());

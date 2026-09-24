@@ -319,6 +319,13 @@ for (const e of man.desk) addSprite(e, desk, common, 0);
 const copy = sprites.find(m => m.userData.name === 'd29_tw_copy'), sheet = sprites.find(m => m.userData.name === 'd33_sheet');
 const paper = [sheet, copy].filter(Boolean);
 const manualS = sprites.filter(m => m.userData.name === 'd26_manual');          // opens the Owner's Manual reader
+window.__manualRect = () => {                              // where the manual lies on screen: the reader closes onto it
+  const m = manualS[0]; if (!m) return null;
+  const pts = [[-.5, -.5], [.5, -.5], [.5, .5], [-.5, .5]].map(([x, y]) => m.localToWorld(new THREE.Vector3(x, y, 0)).project(camera));
+  const xs = pts.map(p => (p.x + 1) / 2 * innerWidth), ys = pts.map(p => (1 - p.y) / 2 * innerHeight);
+  const x = Math.min(...xs), y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+};
 /* lamp light = the comp's own two light layers, exported from Figma as rendered (blur, gradient and opacity baked):
    - "Shine" #1468:442 (light_shine.webp): the wedge from the shade to the typewriter, #EDCB80, blend Screen.
    - typewriter "Glow" #1037:589 (light_glow.webp): the halo behind the typewriter, #EDCB80. The comp blends it Normal;
