@@ -41,6 +41,7 @@
 <p id="nogl" hidden>Your browser couldn't start the 3D scene. The Metro Rewind is coming January 7, 2027. You can still sign up for news and share your story.</p>
 <div id="deskKeys">
   <button class="skip" type="button" id="storyBtn">Share your Metro story</button>
+  <button class="skip" type="button" id="manualBtn">Read the Metro Owner's Manual</button>
   <button class="skip" type="button" id="lampBtn" aria-pressed="true" hidden>Desk lamp</button>
 </div>
 <form id="cta" class="scaled" novalidate aria-labelledby="ctaTitle">
@@ -63,6 +64,20 @@
 </main>
 <div id="loading" role="status"><p>Setting the desk…</p></div>
 
+<div id="book" hidden>
+  <div class="scrim" data-bclose></div>
+  <canvas id="bookCanvas" aria-hidden="true"></canvas>
+  <div class="wrap" role="dialog" aria-modal="true" aria-labelledby="bookTitle">
+    <h2 id="bookTitle" class="vh">This is your Metro Owner's Manual, 50th Anniversary Edition</h2>
+    <button class="btn close" type="button" data-bclose>Close <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2 2 10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+    <div class="bar">
+      <button class="btn" type="button" id="bPrev" aria-label="Previous pages"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M14 8H3M7 3.5 2.5 8 7 12.5" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+      <p id="bPage" aria-live="polite">Cover</p>
+      <button class="btn" type="button" id="bNext" aria-label="Next pages"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 3.5 13.5 8 9 12.5" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+      <a class="btn pdf" href="/manual/metro-owners-manual.pdf" target="_blank" rel="noopener">PDF</a>
+    </div>
+  </div>
+</div>
 <div id="modal" hidden>
   <div class="scrim" data-close></div>
   <div class="wrap" role="dialog" aria-modal="true" aria-labelledby="mTitle">
@@ -122,5 +137,6 @@
 </div>
 <script type="module" src="/src/ui.js"></script>
 <script type="module" src="/src/main.js"></script>
+<script type="module" src="/src/manual.js"></script>
 </body>
 </html>

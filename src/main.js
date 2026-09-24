@@ -318,6 +318,7 @@ desk.updateMatrixWorld(true); common.uFrame.value.copy(desk.matrixWorld).invert(
 for (const e of man.desk) addSprite(e, desk, common, 0);
 const copy = sprites.find(m => m.userData.name === 'd29_tw_copy'), sheet = sprites.find(m => m.userData.name === 'd33_sheet');
 const paper = [sheet, copy].filter(Boolean);
+const manualS = sprites.filter(m => m.userData.name === 'd26_manual');          // opens the Owner's Manual reader
 /* lamp light = the comp's own two light layers, exported from Figma as rendered (blur, gradient and opacity baked):
    - "Shine" #1468:442 (light_shine.webp): the wedge from the shade to the typewriter, #EDCB80, blend Screen.
    - typewriter "Glow" #1037:589 (light_glow.webp): the halo behind the typewriter, #EDCB80. The comp blends it Normal;
@@ -613,17 +614,20 @@ canvas.addEventListener('click', ev => {
   if (overClock()) { spin(); return; }
   if (viewT > .9 && overHead()) { lastEmpty = null; lampDue = false; setLamp(!lampOn, clk.elapsedTime); return; }
   if (viewT > .9 && ray.intersectObjects(paper).length) { lastEmpty = null; window.openStories?.(); return; }
+  if (viewT > .9 && ray.intersectObjects(manualS).length) { lastEmpty = null; window.openManual?.(); return; }
   if (deskMode()) { emptyDeskClick(ev); return; }
   if (viewT < .5) goTo(1);            // click the wall: play the full tilt down
 });
 addEventListener('stories', ev => { modalOpen = ev.detail; });
+let bookOpen = false;                                      // the reader covers the desk: stop drawing it
+addEventListener('manual', ev => { bookOpen = ev.detail; modalOpen = ev.detail; });
 let hoverEv = null;                                         // cursor feedback: one raycast per frame at most
 canvas.addEventListener('pointermove', ev => {
   if (ev.pointerType !== 'mouse') return;
   if (!hoverEv) requestAnimationFrame(() => {
     const e = hoverEv; hoverEv = null; if (drag && dragMoved) return;
     ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight * 2 - 1)); ray.setFromCamera(ndc, camera);
-    const over = (viewT > .9 && (overHead() || ray.intersectObjects(paper).length)) || overClock() || viewT < .5;
+    const over = (viewT > .9 && (overHead() || ray.intersectObjects(paper).length || ray.intersectObjects(manualS).length)) || overClock() || viewT < .5;
     canvas.style.cursor = over ? 'pointer' : (zoomed() ? 'grab' : '');
   });
   hoverEv = ev;
@@ -747,6 +751,7 @@ function frame() {
     cardIn = reduce ? want : want > cardIn ? Math.min(1, cardIn + dt / dur) : Math.max(0, cardIn - dt / dur);
   }
   paintCard(cardIn);
+  if (bookOpen) { requestAnimationFrame(frame); return; }
   renderer.setRenderTarget(rt); renderer.render(scene, camera);
   renderer.setRenderTarget(null); renderer.render(postScene, postCam);
   requestAnimationFrame(frame);

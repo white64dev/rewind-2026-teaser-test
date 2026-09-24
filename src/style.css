@@ -110,3 +110,20 @@
   @keyframes fade{from{opacity:0}} @keyframes rise{from{opacity:0;transform:translateY(24px) scale(.98)}}
   @media (max-width:640px){ .sheet{padding:28px 20px 20px} .cards{grid-template-columns:1fr} .wanted{font-size:19px;text-align:left} .rc{min-height:0} .rc .h{font-size:30px} }
   @media (prefers-reduced-motion:reduce){ #modal .scrim,#modal .wrap{animation:none} .rc,.btn{transition:none} }
+
+  /* ---- Metro Owner's Manual reader ---- */
+  #book{position:fixed;inset:0;z-index:20}
+  #book[hidden]{display:none!important}
+  #book .scrim{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,rgba(20,12,8,.55),rgba(10,6,4,.88));opacity:0;transition:opacity .5s}
+  #book.on .scrim{opacity:1}
+  #bookCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:pointer}
+  #book .wrap{position:absolute;inset:0;pointer-events:none}
+  #book .close{position:absolute;top:calc(env(safe-area-inset-top,0px) + 20px);right:20px;color:#fff;border-color:#fff;pointer-events:auto}
+  #book .close:hover{background:rgba(255,255,255,.12)} #book .close:focus-visible{outline-color:#fff}
+  #book .bar{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);transform:translateX(-50%);display:flex;align-items:center;gap:12px;pointer-events:auto;
+    color:#fff;font:700 13px/1 Archivo,"Helvetica Neue",Arial,sans-serif;opacity:0;transition:opacity .4s .3s}
+  #book.on .bar{opacity:1}
+  #book .bar .btn{color:#fff;border-color:#fff;text-decoration:none} #book .bar .btn:hover{background:rgba(255,255,255,.12)} #book .bar .btn:focus-visible{outline-color:#fff}
+  #book .bar .btn[disabled]{opacity:.35}
+  #bPage{margin:0;min-width:150px;text-align:center}
+  @media (prefers-reduced-motion:reduce){ #book .scrim,#book .bar{transition:none} }
