@@ -320,7 +320,8 @@ const copy = sprites.find(m => m.userData.name === 'd29_tw_copy'), sheet = sprit
 const paper = [sheet, copy].filter(Boolean);
 /* lamp light = the comp's own two light layers, exported from Figma as rendered (blur, gradient and opacity baked):
    - "Shine" #1468:442 (light_shine.webp): the wedge from the shade to the typewriter, #EDCB80, blend Screen.
-   - typewriter "Glow" #1037:589 (light_glow.webp): the halo behind the typewriter, #EDCB80, normal blend.
+   - typewriter "Glow" #1037:589 (light_glow.webp): the halo behind the typewriter, #EDCB80. The comp blends it Normal;
+     here it is Screen like the Shine, so the halo reads as the same light (Sohye: Normal was too yellow and dark).
    The comp also lays the Glow at .15 OVER the typewriter; here it goes behind it too, so the halo keeps its
    strength without a haze on the hero.
    Figma blends in sRGB; the render target blends in linear. srgbBlend() fits the sRGB-space result out = s + k·dst
@@ -349,7 +350,7 @@ const beam = lightLayer('light_shine.webp', [108, 205.5, 912, 628],
 beam.renderOrder = tw.renderOrder - 1.5;                                 // under the typewriter and its sheet: they stay the hero
 const beamU = beam.material.uniforms;
 const glows = [1, .2].map((k, i) => {                                  // .75 (baked in the export) and .15 = .2 × .75
-  const g = lightLayer('light_glow.webp', [558, 222, 592, 633], `a *= ${k.toFixed(2)}; gl_FragColor = srgbBlend(uCol * a, vec3(1. - a));`);   // Normal: a·c + dst·(1 − a)
+  const g = lightLayer('light_glow.webp', [558, 222, 592, 633], `a *= ${k.toFixed(2)}; gl_FragColor = srgbBlend(uCol * a, 1. - uCol * a);`);   // Screen, like the Shine (the comp's Normal read too yellow and dark)
   g.renderOrder = tw.renderOrder - .5 + i * .1; return g;               // behind the typewriter, over everything under it
 });
 /* coffee steam: two soft, curling wisp layers rising off the cup toward the camera */
