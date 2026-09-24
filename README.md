@@ -47,6 +47,9 @@ Per-object parameters (height, cast shadow, and so on) live in the table at the 
 
 ## Placeholders to replace before launch
 
+- Indexing: the test deploy is `noindex`. At launch, remove the robots meta in `index.html` and the `X-Robots-Tag` header in `vercel.json`.
+- Share URLs: set `SITE_URL` (e.g. `https://example.com`) as a build env var so canonical and Open Graph tags are absolute. On Vercel the production domain is used automatically. The share image is `public/og.jpg` (1200×630, cropped from the wall comp).
+
 - Fonts: Roboto Serif (condensed) and Archivo stand in for the licensed New Spirit Compressed and Helvetica Now.
 - The category descriptions in the stories modal are draft copy.
 - The newsletter and story endpoints are not wired up.

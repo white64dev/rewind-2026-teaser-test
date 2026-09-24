@@ -73,6 +73,24 @@ Entry format:
 - **Prevent:** read headless results with these limits in mind, and confirm
   timing and type in a real browser.
 
+### `vite build` fails in the device shell (rollup native module not found)
+- **Area:** tooling
+- **Cause:** `node_modules` was installed on macOS, so it holds the darwin
+  build of rollup's native binary. The device shell is a Linux VM.
+- **Fix:** build on the Mac itself (`npm run build`), or copy the sources
+  without `node_modules` into the cloud container, `npm install`, and build
+  there.
+- **Prevent:** never run `npm install` from the Linux VM into the Mac folder,
+  since that would break the Mac's own install.
+
+### SVGs stopped scaling after svgo
+- **Area:** assets
+- **Cause:** svgo's default preset removes `viewBox`. An `<img>` SVG without a
+  `viewBox` does not scale to its CSS width.
+- **Fix:** run svgo with `removeViewBox: false`. Check the result by rendering
+  the old and new files and diffing the pixels.
+- **Prevent:** always keep `viewBox` when minifying UI SVGs.
+
 ## Git and GitHub
 
 ### Git breaks inside the mounted folder (`index.lock`, garbage objects)
@@ -164,6 +182,17 @@ Entry format:
   tighter inner spacing.
 - **Prevent:** check the modal at a short laptop height (around 700px) and on a
   phone.
+
+### The scene waited up to 2.5 s for a font nobody used
+- **Area:** scene
+- **Cause:** `main.js` awaited `Barlow Condensed` before building the scene,
+  but the flip cards are drawn in Archivo 700. Worse, the cards drawn before
+  the fonts arrived were cached with the fallback face.
+- **Fix:** await `700 53px Archivo`, then clear `texCache` and redraw the
+  cards. Barlow Condensed and IBM Plex Mono were dropped from the font request.
+- **Prevent:** when fonts change, grep for `document.fonts.load` and canvas
+  `font =` strings. The font request should list only faces the CSS or the
+  canvas uses.
 
 ## Communication
 

@@ -24,10 +24,12 @@
   const show = n => { steps.forEach(s => s.hidden = s.dataset.step != n); form.scrollTop = 0; const f = steps[n - 1].querySelector('input,select,textarea,button'); f && f.focus({ preventScroll: true }); };
   window.openStories = () => {
     if (!modal.hidden) return;
-    lastFocus = document.activeElement; modal.hidden = false; document.body.style.overflow = 'hidden'; show(1);
+    lastFocus = document.activeElement; modal.hidden = false; document.body.style.overflow = 'hidden'; setInert(true); show(1);
     dispatchEvent(new CustomEvent('stories', { detail: true }));
   };
-  const close = () => { modal.hidden = true; document.body.style.overflow = ''; lastFocus && lastFocus.focus && lastFocus.focus(); dispatchEvent(new CustomEvent('stories', { detail: false })); };
+  // everything behind the dialog leaves the tab order and the accessibility tree while it is open
+  const setInert = on => { for (const el of document.body.children) if (el !== modal && el.tagName !== 'SCRIPT') el.inert = on; };
+  const close = () => { modal.hidden = true; document.body.style.overflow = ''; setInert(false); lastFocus && lastFocus.focus && lastFocus.focus(); dispatchEvent(new CustomEvent('stories', { detail: false })); };
   modal.addEventListener('click', ev => { if (ev.target.closest('[data-close]')) close(); });
   addEventListener('keydown', ev => {
     if (modal.hidden) return;
@@ -39,11 +41,22 @@
       else if (!ev.shiftKey && document.activeElement === z) { ev.preventDefault(); a.focus(); }
     }
   });
-  document.querySelectorAll('[data-open-stories]').forEach(b => b.addEventListener('click', () => window.openStories()));
+  document.querySelectorAll('[data-open-stories], #storyBtn').forEach(b => b.addEventListener('click', () => window.openStories()));
   form.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => show(+b.dataset.go)));
-  // step 1 → 2: picking a card moves on, carrying the category
-  form.querySelectorAll('input[name=cat]').forEach(r => r.addEventListener('change', () => { $('#cat2').value = r.value; setTimeout(() => show(2), 220); }));
-  form.querySelectorAll('.rc').forEach(c => c.addEventListener('keydown', ev => { if (ev.key === 'Enter') { const r = c.querySelector('input'); r.checked = true; r.dispatchEvent(new Event('change')); } }));
+  // step 1 → 2: clicking a card (or Enter / Space on it) moves on, carrying the category.
+  // Arrow keys only change the selection, so keyboard users can read every option first.
+  let viaPointer = false;
+  const advance = () => setTimeout(() => show(2), 220);
+  form.querySelectorAll('.rc').forEach(c => c.addEventListener('pointerdown', () => { viaPointer = true; }));
+  form.querySelectorAll('input[name=cat]').forEach(r => r.addEventListener('change', () => {
+    $('#cat2').value = r.value;
+    if (viaPointer) advance();
+    viaPointer = false;
+  }));
+  form.querySelectorAll('.rc').forEach(c => c.addEventListener('keydown', ev => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    ev.preventDefault(); const r = c.querySelector('input'); r.checked = true; $('#cat2').value = r.value; advance();
+  }));
   // step 2
   const txt = $('#storyText'), count = $('#count'), sErr = $('#storyErr');
   txt.addEventListener('input', () => { count.textContent = txt.value.length + '/500'; sErr.hidden = true; txt.removeAttribute('aria-invalid'); });
@@ -84,6 +97,9 @@
     snd.setAttribute('aria-pressed', String(on));
     if (on && !ac) startAudio();
     if (ac) { ac.resume(); gain.gain.setTargetAtTime(on ? .09 : 0, ac.currentTime, .25); }
+  });
+  document.addEventListener('visibilitychange', () => {            // no room tone from a background tab
+    if (!ac) return; document.hidden ? ac.suspend() : snd.getAttribute('aria-pressed') === 'true' && ac.resume();
   });
   window.ding = () => {                                        // carriage-return bell
     if (!ac || snd.getAttribute('aria-pressed') !== 'true') return;

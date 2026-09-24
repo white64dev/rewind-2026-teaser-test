@@ -1,19 +1,22 @@
 // Metro Rewind teaser — Three.js scene: wall → desk cube-pitch transition, relit image layers, typing sheet.
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 const FRAME_W = 1728, FRAME_H = 1038, DESK_Y = 1038;       // design px; desk frame sits under the wall frame
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const canvas = document.getElementById('stage');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// The scene is drawn into a multisampled target and copied through the post pass, so the canvas itself needs no MSAA.
+// Every surface is a custom shader: no environment map or shadow map is used.
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' }); }
+catch (err) {                                              // no WebGL: drop the loader so the page UI and the fallback copy stay usable
+  document.getElementById('loading').classList.add('done'); document.getElementById('nogl').hidden = false; canvas.hidden = true;
+  throw err;
+}
+let pixelRatio = Math.min(devicePixelRatio, 2);
+renderer.setPixelRatio(pixelRatio);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#2a1f18');
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
 // Cube-interior rig (from the motion spec): camera stands FRAME_H/2 from the wall and FRAME_H/2 above the desk,
 // vertical FOV 90° so the wall fills the frame at 0° pitch and the desk fills it at 90°. It only rotates.
@@ -172,6 +175,7 @@ function updateShadows() {
     let near = 1;
     if (U === common) { _v.set(cx - L.x, -cy - L.y, e.z - L.z).normalize(); near = THREE.MathUtils.smoothstep(_v.dot(U.uSpotDir.value), Math.cos(.75), Math.cos(.3)); }
     su.uOn.value = S.shadows * S.relight * (0.3 + 0.7 * near) * (S.normals ? 0 : 1);
+    s.visible = su.uOn.value > .001;                       // shadows are off by default: skip the draw, not just the pixels
   }
 }
 
@@ -262,6 +266,7 @@ function hops(from, to, max) {                         // evenly spaced values f
   return out;
 }
 function spin() {
+  if (reduce) { for (const u of units) u.show(u.final); return; }   // reduced motion: just show launch day
   const now = new Date(), dir = now < LAUNCH ? 1 : -1;
   const m0 = now.getMonth(), d0 = now.getDate(), y0 = now.getFullYear();
   units[0].show(MONTHS[m0]); units[1].show(String(d0).padStart(2, '0')); units[2].show(String(y0));
@@ -277,8 +282,9 @@ function wallCopy() {}                                                     // th
 
 /* ---------- build from manifest ---------- */
 const man = await (await fetch('/assets/manifest.json')).json();
-await Promise.race([document.fonts.load('800 30px "Barlow Condensed"'), new Promise(r => setTimeout(r, 2500))]);
-await document.fonts.load('600 60px "Barlow Condensed"').catch(() => {});
+// the flip cards are drawn to canvas in Archivo 700: wait for it (briefly), then redraw the cards made before it arrived
+await Promise.race([document.fonts.load('700 53px Archivo').catch(() => {}), new Promise(r => setTimeout(r, 2500))]);
+texCache.forEach(t => t.dispose()); texCache.clear(); for (const u of units) u.set(u.cur, u.cur);
 for (const e of man.wall) addSprite(e, scene, wallU, 0);
 wallCopy();
 // dust motes drifting through the beam (brightness comes from the same sun mask)
@@ -586,24 +592,42 @@ canvas.addEventListener('click', ev => {
   if (viewT < .5) goTo(1);            // click the wall: play the full tilt down
 });
 addEventListener('stories', ev => { modalOpen = ev.detail; });
+let hoverEv = null;                                         // cursor feedback: one raycast per frame at most
 canvas.addEventListener('pointermove', ev => {
-  ndc.set(ev.clientX / innerWidth * 2 - 1, -(ev.clientY / innerHeight * 2 - 1)); ray.setFromCamera(ndc, camera);
-  const over = (viewT > .9 && (overHead() || ray.intersectObjects(paper).length)) || overClock() || viewT < .5;
-  canvas.style.cursor = over ? 'pointer' : (zoomed() ? 'grab' : '');
-});
+  if (ev.pointerType !== 'mouse') return;
+  if (!hoverEv) requestAnimationFrame(() => {
+    const e = hoverEv; hoverEv = null; if (drag && dragMoved) return;
+    ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight * 2 - 1)); ray.setFromCamera(ndc, camera);
+    const over = (viewT > .9 && (overHead() || ray.intersectObjects(paper).length)) || overClock() || viewT < .5;
+    canvas.style.cursor = over ? 'pointer' : (zoomed() ? 'grab' : '');
+  });
+  hoverEv = ev;
+}, { passive: true });
 addEventListener('keydown', ev => { if (modalOpen || ev.target.closest?.('input,textarea,select')) return; if (ev.key === 'ArrowDown' || ev.key === 'PageDown') { ev.preventDefault(); goTo(1); } if (ev.key === 'ArrowUp' || ev.key === 'PageUp') { ev.preventDefault(); goTo(0); } });
 const tog = (id, k) => { const b = document.getElementById(id); b.addEventListener('click', () => { S[k] = S[k] ? 0 : 1; b.setAttribute('aria-pressed', !!S[k]); }); };
 
 const back = document.getElementById('back'), wallcard = document.getElementById('wallcard');
 document.getElementById('scrollDown').addEventListener('click', () => goTo(1));
 back.addEventListener('click', () => goTo(0));
+const lampBtn = document.getElementById('lampBtn');           // keyboard stand-in for clicking the lamp shade
+lampBtn.addEventListener('click', () => setLamp(!lampOn, clk.elapsedTime));
 
 /* ---------- loop ---------- */
 const clk = new THREE.Clock();
 let started = false;
 mgr.onLoad = () => { document.getElementById('loading').classList.add('done'); if (!started) { started = true; setTimeout(spin, 500); } };
+// adaptive resolution: if the device can't hold ~40 fps, step the pixel ratio down (never back up, so it can't oscillate)
+const perf = { n: 0, sum: 0 };
+function adaptResolution(rawDt, t) {
+  if (t < 4 || document.hidden || rawDt > .25 || pixelRatio <= 1) return;   // skip loading, tab switches and floor
+  perf.n++; perf.sum += rawDt;
+  if (perf.n < 120) return;
+  if (perf.sum / perf.n > 1 / 40) { pixelRatio = Math.max(1, pixelRatio - .25); renderer.setPixelRatio(pixelRatio); resize(); }
+  perf.n = 0; perf.sum = 0;
+}
 function frame() {
-  const dt = Math.min(clk.getDelta(), .05), t = clk.elapsedTime;
+  const rawDt = clk.getDelta(), dt = Math.min(rawDt, .05), t = clk.elapsedTime;
+  adaptResolution(rawDt, t);
   const ease = reduce ? 1 : 1 - Math.pow(.001, dt);
   mouse.x += (mouse.tx - mouse.x) * ease; mouse.y += (mouse.ty - mouse.y) * ease;
   // scripted transitions drive the real scroll position, so scroll and click share one timeline
@@ -683,6 +707,8 @@ function frame() {
   lampLevel += ((lampOn ? flickOn : 0) - lampLevel) * (t < flickUntil ? 1 : 1 - Math.pow(.0001, dt));
   common.uAmb.value = .76 + .21 * lampLevel;
   back.classList.toggle('show', viewT > .95);
+  const onDesk = viewT > .95; if (lampBtn.hidden === onDesk) lampBtn.hidden = !onDesk;
+  const pressed = String(lampOn); if (lampBtn.getAttribute('aria-pressed') !== pressed) lampBtn.setAttribute('aria-pressed', pressed);
   for (const m of steam) { m.material.uniforms.uOn.value = THREE.MathUtils.smoothstep(viewT, .6, 1); m.position.z = m.userData.z * THREE.MathUtils.smoothstep(viewT, .35, .95); }
   wallcard.classList.toggle('gone', viewT > .06);
   renderer.setRenderTarget(rt); renderer.render(scene, camera);
