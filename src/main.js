@@ -349,7 +349,7 @@ const beam = lightLayer('light_shine.webp', [108, 205.5, 912, 628],
   'gl_FragColor = srgbBlend(uCol * a, 1. - uCol * a);');                 // Screen: s + dst·(1 − s)
 beam.renderOrder = tw.renderOrder - 1.5;                                 // under the typewriter and its sheet: they stay the hero
 const beamU = beam.material.uniforms;
-const glows = [1, .2].map((k, i) => {                                  // .75 (baked in the export) and .15 = .2 × .75
+const glows = [1.07, .3].map((k, i) => {                               // peak .8 like the Shine (export bakes .75), plus the .15 veil ×1.5, both behind
   const g = lightLayer('light_glow.webp', [558, 222, 592, 633], `a *= ${k.toFixed(2)}; gl_FragColor = srgbBlend(uCol * a, 1. - uCol * a);`);   // Screen, like the Shine (the comp's Normal read too yellow and dark)
   g.renderOrder = tw.renderOrder - .5 + i * .1; return g;               // behind the typewriter, over everything under it
 });
