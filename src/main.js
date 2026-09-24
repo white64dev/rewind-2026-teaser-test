@@ -146,7 +146,7 @@ function addSprite(e, parent, U, recvZ = 0) {
   return m;
 }
 // raised layers are pulled toward the camera axis and shrunk so that, at rest, each lands exactly where the comp has it
-function placeSprites(ax, lift) {
+function placeSprites(ax, lift, zx = 0, zy = 0) {
   for (const m of sprites) {
     const e = m.userData, z = m.onDesk ? e.z * lift : e.z, k = (D - z) / D;
     let px = m.cx + m.off.x, py = m.cy + m.off.y;
@@ -154,7 +154,8 @@ function placeSprites(ax, lift) {
       const c = Math.cos(m.rot), s = Math.sin(m.rot), vx = -m.pivot.x, vy = -m.pivot.y;
       px += m.pivot.x + vx * c + vy * s; py += m.pivot.y - vx * s + vy * c;
     }
-    m.position.set(ax + (px - ax) * k, -D + (-py + D) * k, z); m.rotation.z = m.rot || 0;
+    const cxC = m.onDesk ? ax + zx : ax, cyC = m.onDesk ? D + zy : D;
+    m.position.set(cxC + (px - cxC) * k, -cyC + (-py + cyC) * k, z); m.rotation.z = m.rot || 0;
     m.scale.set(e.w * m.pad[0] * k, e.h * m.pad[1] * k, 1);
   }
   for (const s of casters) { const { e, K, cx, cy, owner } = s.userData; s.scale.set(e.w * K, e.h * K, 1);
@@ -503,6 +504,44 @@ function overHead() {                                     // is the pointer on t
   const hit = ray.ray.intersectPlane(deskPlane, new THREE.Vector3()); if (!hit) return false;
   desk.worldToLocal(hit); return Math.hypot(hit.x - HEAD.x, hit.y - HEAD.y) < 80;
 }
+/* desk zoom — pinch, ctrl/⌘ + wheel (trackpad pinch), ⌘/ctrl + = − 0, double-click.
+   Only the desk zooms; the page itself never scales. Zoomed in, drag / two-finger scroll pans the desk. */
+const Z = { z: 1, t: 1, x: 0, y: 0, tx: 0, ty: 0, max: 3 };
+const deskMode = () => viewT > .9 && !modalOpen;
+const zoomed = () => deskMode() && Z.t > 1.01;
+function clampZ() {
+  const hw = VW / 2, hh = VW / camera.aspect / 2;
+  const mx = Math.max(0, FRAME_W / 2 - hw / Z.t), my = Math.max(0, FRAME_H / 2 - hh / Z.t);
+  Z.tx = Math.min(mx, Math.max(-mx, Z.tx)); Z.ty = Math.min(my, Math.max(-my, Z.ty));
+}
+function zoomAt(nz, nx = 0, ny = 0) {                      // keep the desk point under the pointer (ndc) still
+  nz = Math.min(Z.max, Math.max(1, nz));
+  const hw = VW / 2, hh = VW / camera.aspect / 2, d = 1 / Z.t - 1 / nz;
+  Z.tx += nx * hw * d; Z.ty -= ny * hh * d; Z.t = nz; clampZ();
+}
+const toNdc = (x, y) => [x / innerWidth * 2 - 1, -(y / innerHeight * 2 - 1)];
+function panBy(dxPx, dyPx) { const u = VW / innerWidth / Z.t; Z.tx -= dxPx * u; Z.ty -= dyPx * u; clampZ(); }
+addEventListener('wheel', ev => {
+  if (!deskMode()) return;
+  if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); zoomAt(Z.t * Math.exp(-ev.deltaY * .01), ...toNdc(ev.clientX, ev.clientY)); return; }
+  if (Z.t > 1.01) { ev.preventDefault(); panBy(-ev.deltaX, -ev.deltaY); }
+}, { passive: false });
+let g0 = 1;                                                // Safari trackpad pinch
+document.addEventListener('gesturestart', ev => { if (deskMode()) { ev.preventDefault(); g0 = Z.t; } });
+document.addEventListener('gesturechange', ev => { if (deskMode()) { ev.preventDefault(); zoomAt(g0 * ev.scale, ...toNdc(ev.clientX ?? innerWidth / 2, ev.clientY ?? innerHeight / 2)); } });
+document.addEventListener('gestureend', ev => { if (deskMode()) ev.preventDefault(); });
+addEventListener('keydown', ev => {
+  if (!deskMode() || !(ev.ctrlKey || ev.metaKey)) return;
+  if (ev.key === '=' || ev.key === '+') { ev.preventDefault(); zoomAt(Z.t * 1.3); }
+  else if (ev.key === '-') { ev.preventDefault(); zoomAt(Z.t / 1.3); }
+  else if (ev.key === '0') { ev.preventDefault(); Z.t = 1; Z.tx = Z.ty = 0; }
+});
+canvas.addEventListener('dblclick', ev => {
+  if (!deskMode()) return;
+  if (Z.t > 1.01) { Z.t = 1; Z.tx = Z.ty = 0; } else zoomAt(2, ...toNdc(ev.clientX, ev.clientY));
+});
+const touches = new Map(); let pinch = null;
+function pinchState() { const [a, b] = [...touches.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; }
 let tween = null;
 const maxScroll = () => document.documentElement.scrollHeight - innerHeight;
 function goTo(p, dur = 2.2) {
@@ -515,22 +554,29 @@ addEventListener('wheel', stopTween, { passive: true }); addEventListener('touch
 let dragPan = 0, panVel = 0, scrollVel = 0, drag = null, dragMoved = false;
 canvas.addEventListener('pointerdown', ev => {
   if (ev.button > 0) return;
+  if (ev.pointerType === 'touch') { touches.set(ev.pointerId, { x: ev.clientX, y: ev.clientY }); if (touches.size === 2 && deskMode()) { const p = pinchState(); pinch = { ...p, z0: Z.t }; drag = null; dragMoved = true; return; } }
   drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, sx: ev.clientX, sy: ev.clientY, t: performance.now(), type: ev.pointerType }; dragMoved = false; tween = null; panVel = scrollVel = 0;
   if (ev.pointerType === 'mouse') canvas.setPointerCapture(ev.pointerId);
 });
 canvas.addEventListener('pointermove', ev => {
+  if (touches.has(ev.pointerId)) touches.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (pinch && touches.size === 2) {                       // two fingers: zoom around their midpoint and pan with it
+    const p = pinchState(); zoomAt(pinch.z0 * p.d / pinch.d, ...toNdc(p.mx, p.my)); panBy(p.mx - pinch.mx, p.my - pinch.my);
+    pinch.mx = p.mx; pinch.my = p.my; return;
+  }
   if (!drag || ev.pointerId !== drag.id) return;
   const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y, now = performance.now(), dt = Math.max(1, now - drag.t);
   if (!dragMoved && Math.hypot(ev.clientX - drag.sx, ev.clientY - drag.sy) > 6) dragMoved = true;
   const ux = VW / innerWidth;                                   // screen px → design px
+  if (zoomed()) { panBy(dx, dy); drag.x = ev.clientX; drag.y = ev.clientY; drag.t = now; if (dragMoved) canvas.style.cursor = 'grabbing'; return; }
   dragPan -= dx * ux; panVel = -dx * ux / dt * 16;
-  if (drag.type === 'mouse') { const k = 1.6; scrollBy(0, -dy * k); scrollVel = -dy * k / dt * 16; }   // touch scrolls natively
+  if (drag.type === 'mouse' || deskMode()) { const k = 1.6; scrollBy(0, -dy * k); scrollVel = -dy * k / dt * 16; }   // on the desk, touch scrolling is ours too
   drag.x = ev.clientX; drag.y = ev.clientY; drag.t = now;
   if (dragMoved) canvas.style.cursor = 'grabbing';
 });
-const endDrag = ev => { if (drag && ev.pointerId === drag.id) { drag = null; canvas.style.cursor = ''; } };
+const endDrag = ev => { touches.delete(ev.pointerId); if (touches.size < 2) pinch = null; if (drag && ev.pointerId === drag.id) { drag = null; canvas.style.cursor = ''; } };
 canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
-addEventListener('wheel', ev => { if (Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) { dragPan += ev.deltaX * VW / innerWidth; panVel = 0; } }, { passive: true });   // trackpad sideways swipe
+addEventListener('wheel', ev => { if (zoomed() || ev.ctrlKey || ev.metaKey) return; if (Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) { dragPan += ev.deltaX * VW / innerWidth; panVel = 0; } }, { passive: true });   // trackpad sideways swipe
 canvas.addEventListener('click', ev => {
   if (dragMoved) { dragMoved = false; return; }             // a drag is not a click
   ndc.set(ev.clientX / innerWidth * 2 - 1, -(ev.clientY / innerHeight * 2 - 1)); ray.setFromCamera(ndc, camera);
@@ -543,7 +589,7 @@ addEventListener('stories', ev => { modalOpen = ev.detail; });
 canvas.addEventListener('pointermove', ev => {
   ndc.set(ev.clientX / innerWidth * 2 - 1, -(ev.clientY / innerHeight * 2 - 1)); ray.setFromCamera(ndc, camera);
   const over = (viewT > .9 && (overHead() || ray.intersectObjects(paper).length)) || overClock() || viewT < .5;
-  canvas.style.cursor = over ? 'pointer' : '';
+  canvas.style.cursor = over ? 'pointer' : (zoomed() ? 'grab' : '');
 });
 addEventListener('keydown', ev => { if (modalOpen || ev.target.closest?.('input,textarea,select')) return; if (ev.key === 'ArrowDown' || ev.key === 'PageDown') { ev.preventDefault(); goTo(1); } if (ev.key === 'ArrowUp' || ev.key === 'PageUp') { ev.preventDefault(); goTo(0); } });
 const tog = (id, k) => { const b = document.getElementById(id); b.addEventListener('click', () => { S[k] = S[k] ? 0 : 1; b.setAttribute('aria-pressed', !!S[k]); }); };
@@ -579,10 +625,16 @@ function frame() {
   const cx = FRAME_W / 2 + dragPan + mouse.x * Math.min(pan, 24);   // drag/swipe pan + a touch of hover parallax
   camera.position.set(cx + mouse.x * 6, -D - mouse.y * 4, D);
   camera.rotation.set(-Math.PI / 2 * e, 0, 0);            // 0° wall → 90° desk
+  if (viewT < .9) { Z.t = 1; Z.tx = Z.ty = 0; }             // leaving the desk always resets the zoom
+  const zk = reduce ? 1 : 1 - Math.pow(.0005, dt);
+  Z.z += (Z.t - Z.z) * zk; Z.x += (Z.tx - Z.x) * zk; Z.y += (Z.ty - Z.y) * zk;
+  camera.position.x += Z.x * e; camera.position.z += Z.y * e;
+  const cz = 1 + (Z.z - 1) * e; if (camera.zoom !== cz) { camera.zoom = cz; camera.updateProjectionMatrix(); }
+  const ta = deskMode() ? 'none' : 'pan-y'; if (canvas.style.touchAction !== ta) canvas.style.touchAction = ta;
   camera.updateMatrixWorld();
   // desk objects rest flat while seen edge-on, and rise to their heights as the view turns overhead
   const lift = THREE.MathUtils.smoothstep(e, .35, .95);
-  placeSprites(cx, lift);
+  placeSprites(cx, lift, Z.x * e, Z.y * e);
   const bell = Math.sin(Math.PI * e);
   post.uniforms.uK.value = reduce ? 0 : K_MAX * bell;
   post.uniforms.uBlur.value = reduce || e <= 0 || e >= 1 ? 0 : Math.min(Math.pow(bell, 1.5) * BLUR_MAX + Math.min(Math.abs(vel) * 900, 12), BLUR_CAP) * renderer.getPixelRatio();
