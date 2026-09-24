@@ -17,9 +17,9 @@ npm run preview   # serve dist/
 
 - **Transition.** Two faces of a box interior: the wall comp is the back face and the desk comp is the floor. The camera stands half a frame from each face and only pitches, 0° → 90°, with a vertical FOV of 90°. Scroll, drag, swipe, a click on the wall, or the Scroll Down card all drive the same timeline: hold 0–14%, pitch 14–78%, then settle. A fisheye and vertical motion-blur post pass run only mid-move.
 - **Layers.** Every desk object is a flat image layer from Figma, placed at its comp position. Layers with height are perspective-corrected so they land exactly on the comp at rest.
-- **Lighting.** The lamp is off during the tilt and flickers on when the desk arrives; clicking the shade toggles it. The beam is a single shader cone that runs white at the lamp and yellow at the pool, aimed at the typewriter sheet. The wall light is the comp's sun patch, animated to breathe, sway and throw dust motes.
+- **Lighting.** The lamp is off during the tilt and switches on a beat (0.8 s) after the desk arrives, then the typing starts; clicking the shade toggles it. The beam is a single shader cone that runs white at the lamp and yellow at the pool, aimed at the typewriter sheet. The wall light is the comp's sun patch, animated to breathe, sway and throw dust motes.
 - **Arrival choreography.** The chair tucks under the desk. The Metrorail map taps down into the folder with small alternating tilts. Photos, the SmarTrip card and the M puzzle square up from slight rotations. Then the typewriter types "Be Part of Metro Rewind".
-- **Wall card.** The "Be Part of Metro Rewind" card tears open from its corner after loading and tears shut, scrubbed by the scroll, before the tilt. It uses a clip-path port of the Replica's crumpled-edge reveal (`src/reveal.js`).
+- **Wall card.** The "Be Part of Metro Rewind" card tears open from its corner after loading and tears shut (over 1.4 s) once the scroll leaves the top. It uses a clip-path port of the Replica's crumpled-edge reveal (`src/reveal.js`).
 - **UI.** The newsletter form and the three-step "Calling for Your Metro Stories" modal validate input, then show a "not connected yet" message. Nothing is sent. The sound toggle plays a synthesized room tone with clock and typewriter clicks.
 
 ## Layout

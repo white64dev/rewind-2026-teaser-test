@@ -4,6 +4,9 @@ import { crumpleReveal } from './reveal.js';
 
 const FRAME_W = 1728, FRAME_H = 1038, DESK_Y = 1038;       // design px; desk frame sits under the wall frame
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// a reload always starts at the wall: the browser would otherwise restore the last scroll position
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+scrollTo(0, 0); addEventListener('pageshow', e => { if (e.persisted) scrollTo(0, 0); });
 const canvas = document.getElementById('stage');
 // The scene is drawn into a multisampled target and copied through the post pass, so the canvas itself needs no MSAA.
 // Every surface is a custom shader: no environment map or shadow map is used.
@@ -426,7 +429,8 @@ function scatter() {
 }
 scatter();
 const easeOutBack = k => { const c = 1.4; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
-let arriveT = -1, lampOn = false, lampLevel = 0, flickUntil = 0;
+let arriveT = -1, lampOn = false, lampLevel = 0, flickUntil = 0, lampDue = true;
+const LAMP_DELAY = .8, TYPE_DELAY = LAMP_DELAY + .6;   // s after the desk arrives: a beat of darkness, the lamp, then the typing
 const LAMP_KEY = 0;            // extra relight of the sprites under the lamp cone (was .24); the comp has none
 const LAMP_FLICKER = false;   // bulb stutter on switch-on and the faint wobble while lit; off for now, flip to bring them back
 const easeOut = k => 1 - Math.pow(1 - k, 3);
@@ -458,7 +462,7 @@ function typeTick(dt) {
           { x: e.from.x + (e.to.x - e.from.x) * q, y: e.from.y + (e.to.y - e.from.y) * q });
   if (typeT >= TY.total) { typeT = -1; typeDone = true; setType(9, 1, { x: 0, y: 0 }); }
 }
-function resetType() { arriveT = -1; scatter(); placeMovers(); lampOn = false; lampLevel = 0; typeDone = false; typeT = -1; evIdx = 0; const f = TY.ev[0]; setType(0, 0, f.from); }
+function resetType() { arriveT = -1; lampDue = true; scatter(); placeMovers(); lampOn = false; lampLevel = 0; typeDone = false; typeT = -1; evIdx = 0; const f = TY.ev[0]; setType(0, 0, f.from); }
 resetType();
 const deskPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), FRAME_H);   // y = -FRAME_H
 // room shell so the swing never shows the void: wall continues past the art, floor runs under the desk
@@ -606,7 +610,7 @@ canvas.addEventListener('click', ev => {
   if (dragMoved) { dragMoved = false; return; }             // a drag is not a click
   ndc.set(ev.clientX / innerWidth * 2 - 1, -(ev.clientY / innerHeight * 2 - 1)); ray.setFromCamera(ndc, camera);
   if (overClock()) { spin(); return; }
-  if (viewT > .9 && overHead()) { lastEmpty = null; setLamp(!lampOn, clk.elapsedTime); return; }
+  if (viewT > .9 && overHead()) { lastEmpty = null; lampDue = false; setLamp(!lampOn, clk.elapsedTime); return; }
   if (viewT > .9 && ray.intersectObjects(paper).length) { lastEmpty = null; window.openStories?.(); return; }
   if (deskMode()) { emptyDeskClick(ev); return; }
   if (viewT < .5) goTo(1);            // click the wall: play the full tilt down
@@ -627,14 +631,15 @@ addEventListener('keydown', ev => { if (modalOpen || ev.target.closest?.('input,
 const tog = (id, k) => { const b = document.getElementById(id); b.addEventListener('click', () => { S[k] = S[k] ? 0 : 1; b.setAttribute('aria-pressed', !!S[k]); }); };
 
 const back = document.getElementById('back'), wallcard = document.getElementById('wallcard');
-// "Be Part of" card: tears open from its corner once the scene has loaded, and tears shut again (scrubbing
-// with the scroll) before the tilt starts, instead of fading while the news form shows through it.
+// "Be Part of" card: tears open from its corner once the scene has loaded, and tears shut again when the
+// scroll leaves the top, instead of fading while the news form shows through it.
 const paintCard = crumpleReveal(wallcard, { origin: 'bottom-right' });
 let cardIn = 0; paintCard(0);
+const CARD_OPEN = .8, CARD_CLOSE = 1.4;                 // s
 document.getElementById('scrollDown').addEventListener('click', () => goTo(1));
 back.addEventListener('click', () => goTo(0));
 const lampBtn = document.getElementById('lampBtn');           // keyboard stand-in for clicking the lamp shade
-lampBtn.addEventListener('click', () => setLamp(!lampOn, clk.elapsedTime));
+lampBtn.addEventListener('click', () => { lampDue = false; setLamp(!lampOn, clk.elapsedTime); });
 
 /* ---------- loop ---------- */
 const clk = new THREE.Clock();
@@ -716,12 +721,13 @@ function frame() {
   updateShadows();
   for (const u of units) u.tick(dt);
   if (viewT > .97 && arriveT < 0) {
-    arriveT = 0; setLamp(true, t);
-    if (reduce) { placeMovers(99); typeDone = true; setType(9, 1, { x: 0, y: 0 }); arriveT = 99; }
+    arriveT = 0;
+    if (reduce) { placeMovers(99); typeDone = true; setType(9, 1, { x: 0, y: 0 }); arriveT = 99; lampDue = false; setLamp(true, t); }
   }
   if (arriveT >= 0 && arriveT < 99) {
     arriveT += dt; placeMovers(arriveT);
-    if (arriveT > 1.1 && typeT < 0 && !typeDone) { typeT = 0; evIdx = 0; }
+    if (lampDue && arriveT >= LAMP_DELAY) { lampDue = false; setLamp(true, t); }
+    if (arriveT > TYPE_DELAY && typeT < 0 && !typeDone) { typeT = 0; evIdx = 0; }
     if (arriveT > 3.2) { placeMovers(99); arriveT = 99; }
   }
   if (viewT < .2 && arriveT >= 0) resetType();
@@ -734,8 +740,12 @@ function frame() {
   const onDesk = viewT > .95; if (lampBtn.hidden === onDesk) lampBtn.hidden = !onDesk;
   const pressed = String(lampOn); if (lampBtn.getAttribute('aria-pressed') !== pressed) lampBtn.setAttribute('aria-pressed', pressed);
   for (const m of steam) { m.material.uniforms.uOn.value = THREE.MathUtils.smoothstep(viewT, .6, 1); m.position.z = m.userData.z * THREE.MathUtils.smoothstep(viewT, .35, .95); }
-  if (started) cardIn = reduce ? 1 : Math.min(1, cardIn + dt / .8);                   // on-load open, once
-  paintCard(Math.min(cardIn, 1 - THREE.MathUtils.clamp((sm - .03) / (.11 - .03), 0, 1)));
+  // opens after load; once the scroll leaves the top it tears shut on its own clock, slow enough to watch
+  if (started) {
+    const want = sm < .03 ? 1 : 0, dur = want ? CARD_OPEN : CARD_CLOSE;
+    cardIn = reduce ? want : want > cardIn ? Math.min(1, cardIn + dt / dur) : Math.max(0, cardIn - dt / dur);
+  }
+  paintCard(cardIn);
   renderer.setRenderTarget(rt); renderer.render(scene, camera);
   renderer.setRenderTarget(null); renderer.render(postScene, postCam);
   requestAnimationFrame(frame);
