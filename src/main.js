@@ -542,10 +542,16 @@ addEventListener('keydown', ev => {
   else if (ev.key === '-') { ev.preventDefault(); zoomAt(Z.t / 1.3); }
   else if (ev.key === '0') { ev.preventDefault(); Z.t = 1; Z.tx = Z.ty = 0; }
 });
-canvas.addEventListener('dblclick', ev => {
-  if (!deskMode()) return;
-  if (Z.t > 1.01) { Z.t = 1; Z.tx = Z.ty = 0; } else zoomAt(2, ...toNdc(ev.clientX, ev.clientY));
-});
+// Double-click zoom is detected here, not with the native dblclick event: that fires for any two quick clicks,
+// so toggling the lamp twice (or clicking the sheet) zoomed the desk. Only two clicks on empty desk count.
+let lastEmpty = null;
+function emptyDeskClick(ev) {
+  const now = performance.now(), l = lastEmpty;
+  if (l && now - l.t < 350 && Math.hypot(ev.clientX - l.x, ev.clientY - l.y) < 12) {
+    lastEmpty = null;
+    if (Z.t > 1.01) { Z.t = 1; Z.tx = Z.ty = 0; } else zoomAt(2, ...toNdc(ev.clientX, ev.clientY));
+  } else lastEmpty = { t: now, x: ev.clientX, y: ev.clientY };
+}
 const touches = new Map(); let pinch = null;
 function pinchState() { const [a, b] = [...touches.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; }
 let tween = null;
@@ -587,8 +593,9 @@ canvas.addEventListener('click', ev => {
   if (dragMoved) { dragMoved = false; return; }             // a drag is not a click
   ndc.set(ev.clientX / innerWidth * 2 - 1, -(ev.clientY / innerHeight * 2 - 1)); ray.setFromCamera(ndc, camera);
   if (overClock()) { spin(); return; }
-  if (viewT > .9 && overHead()) { setLamp(!lampOn, clk.elapsedTime); return; }
-  if (viewT > .9 && ray.intersectObjects(paper).length) { window.openStories?.(); return; }
+  if (viewT > .9 && overHead()) { lastEmpty = null; setLamp(!lampOn, clk.elapsedTime); return; }
+  if (viewT > .9 && ray.intersectObjects(paper).length) { lastEmpty = null; window.openStories?.(); return; }
+  if (deskMode()) { emptyDeskClick(ev); return; }
   if (viewT < .5) goTo(1);            // click the wall: play the full tilt down
 });
 addEventListener('stories', ev => { modalOpen = ev.detail; });

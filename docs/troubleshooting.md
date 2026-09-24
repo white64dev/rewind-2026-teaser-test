@@ -162,6 +162,17 @@ Entry format:
 - **Prevent:** after moving the chair, check the desk-rest frame at the desk
   edge.
 
+### Clicking the lamp twice zoomed the desk
+- **Area:** scene
+- **Cause:** the desk zoom listened to the native `dblclick` event, which fires
+  for any two quick clicks, including two lamp toggles. The OS double-click
+  interval can be long, so a second click 1–2 s later could still count.
+- **Fix:** removed the `dblclick` listener. The click handler now detects the
+  double-click itself: two clicks within 350 ms and 12 px, both on empty desk.
+  A hit on the lamp or the sheet resets the pair.
+- **Prevent:** never bind a gesture to `dblclick` on a canvas that also has
+  click hotspots.
+
 ## DOM
 
 ### The scene went blank, but the logo, sound button and popups still show
