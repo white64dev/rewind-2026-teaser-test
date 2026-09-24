@@ -6,8 +6,8 @@
 // spread down the chain, so the paper curls and then lies flat again. 28 pages = 14 sheets.
 import * as THREE from 'three';
 
-const PAGES = 28, SHEETS = PAGES / 2;
-const PAGE_W = 1, PAGE_H = 648 / 522, THICK = .0025, SEG = 40;
+const PAGES = 20, SHEETS = PAGES / 2;            // the 1976 manual: cover, pages 2–19, back cover
+const PAGE_W = 1, PAGE_H = 1245 / 1000, THICK = .0025, SEG = 40;
 const GUTTER = .75, GUTTER_L = .15;               // open spread: pages rise out of the spine along a smooth curve (rad, page widths)
 const TURN = .9;                                     // seconds per page turn
 const src = n => `/manual/p${String(n).padStart(2, '0')}.webp`;
@@ -102,8 +102,12 @@ export function createBook({ root, canvas, reduce, onPage }) {
       const k = reduce ? 1 : Math.min(1, Math.max(0, (t - sh.t0) / (sh.dur || TURN)));
       sh.a = sh.from + (sh.to - sh.from) * ease(k);
       const mid = sh.flips ? Math.sin(Math.PI * k) : 0;                          // how much this sheet is in flight
+      // the curl is gone before the sheet lands, and the lift comes down early, so the landing page
+      // arrives flat and at the pile's depth: its outer edge doesn't shrink and grow back
+      const bend = sh.flips ? Math.sin(Math.PI * Math.min(1, k / .8)) : 0;
+      const lift = !sh.flips ? 0 : k < .5 ? Math.sqrt(mid) : mid * mid;
       if (k < 1) flying = true;
-      const cover = s === 0 || s === SHEETS - 1, curl = (cover ? .15 : .55) * mid;
+      const cover = s === 0 || s === SHEETS - 1, curl = (cover ? .15 : .55) * bend;
       // root takes the turn, the chain carries a lagging curl that vanishes at both ends of the turn
       // gutter: the slope starts at GUTTER out of the spine and eases to flat (cos(a) mirrors it for left pages,
       // and it fades out while a sheet stands up in flight); the flight curl lags the tip behind the root
@@ -116,7 +120,7 @@ export function createBook({ root, canvas, reduce, onPage }) {
         prev = slope;
       }
       // stacking: each pile keeps its top sheet nearest; a sheet in flight lifts clear of both
-      sh.mesh.position.z = sh.z0 + (sh.z1 - sh.z0) * ease(k) + Math.sqrt(mid) * .07;   // lifts clear at once, settles late
+      sh.mesh.position.z = sh.z0 + (sh.z1 - sh.z0) * ease(k) + lift * .07;          // lifts clear at once, settles before landing
     }
     // closed on the cover: the book sits right of the spine; closed on the back: left; open: centred
     gOpen += ((spread > 0 && spread < SHEETS ? 1 : 0) - gOpen) * (reduce ? 1 : 1 - Math.pow(.02, dt));   // closed books lie flat

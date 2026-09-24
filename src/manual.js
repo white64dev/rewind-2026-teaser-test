@@ -4,8 +4,9 @@ const root = $('#book'), canvas = $('#bookCanvas'), label = $('#bPage'), prevB =
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let book = null, lastFocus = null, busy = false;
 
-const describe = k => k === 0 ? 'Cover' : k === 14 ? 'Back cover' : `Pages ${2 * k}–${2 * k + 1} of 28`;
-function onPage(k) { label.textContent = describe(k); prevB.disabled = k === 0; nextB.disabled = k === 14; }
+const PAGES = 20, SHEETS = PAGES / 2;                          // keep in step with book.js
+const describe = k => k === 0 ? 'Cover' : k === SHEETS ? 'Back cover' : `Pages ${2 * k}–${2 * k + 1} of ${PAGES}`;
+function onPage(k) { label.textContent = describe(k); prevB.disabled = k === 0; nextB.disabled = k === SHEETS; }
 const setInert = on => { for (const el of document.body.children) if (el !== root && el.tagName !== 'SCRIPT') el.inert = on; };
 
 window.openManual = async () => {
@@ -42,7 +43,7 @@ addEventListener('keydown', ev => {
   else if (ev.key === 'ArrowRight' || ev.key === 'PageDown') { ev.preventDefault(); book?.next(); }
   else if (ev.key === 'ArrowLeft' || ev.key === 'PageUp') { ev.preventDefault(); book?.prev(); }
   else if (ev.key === 'Home') { ev.preventDefault(); book?.go(0); }
-  else if (ev.key === 'End') { ev.preventDefault(); book?.go(14); }
+  else if (ev.key === 'End') { ev.preventDefault(); book?.go(SHEETS); }
   else if (ev.key === 'Tab') {                                   // keep focus inside the reader
     const f = [...root.querySelectorAll('button,[href]')].filter(e => !e.disabled && e.offsetParent !== null);
     if (!f.length) return; const a = f[0], z = f[f.length - 1];
