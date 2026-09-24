@@ -1,5 +1,6 @@
 // Metro Rewind teaser — Three.js scene: wall → desk cube-pitch transition, relit image layers, typing sheet.
 import * as THREE from 'three';
+import { crumpleReveal } from './reveal.js';
 
 const FRAME_W = 1728, FRAME_H = 1038, DESK_Y = 1038;       // design px; desk frame sits under the wall frame
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -252,13 +253,13 @@ class Flip {
 const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 const units = [
   new Flip(966.3, 99, CARD_H, 'JAN'),
-  new Flip(1070.1, 76.7, CARD_H, '15'),
+  new Flip(1070.1, 76.7, CARD_H, '07'),
   new Flip(1184.8, 120.7, CARD_H, '2027'),
 ];
 { const n = new Date(); units[0].show(MONTHS[n.getMonth()]); units[1].show(String(n.getDate()).padStart(2, '0')); units[2].show(String(n.getFullYear())); }   // today, until the flip starts
-// on load the clock shows the visitor's today and flips to launch day, JAN 15 2027.
+// on load the clock shows the visitor's today and flips to launch day, JAN 07 2027 (per the comp).
 // Long gaps are sampled so each card turns at most a handful of times (~2s total, whatever the date).
-const LAUNCH = new Date(2027, 0, 15);
+const LAUNCH = new Date(2027, 0, 7);
 function hops(from, to, max) {                         // evenly spaced values from→to (excluding from, ending on to)
   const n = Math.abs(to - from); if (!n) return [];
   const k = Math.min(n, max), out = [];
@@ -275,7 +276,7 @@ function spin() {
   while (mi !== 0 || (dir < 0 && months.length === 0 && m0 !== 0)) { mi = (mi + dir + 12) % 12; months.push(mi); if (months.length > 12) break; }
   const ms = months.length > 7 ? hops(0, months.length - 1, 7).map(i => months[i]) : months;
   units[2].push(hops(y0, 2027, 5).map(String), 0);
-  units[1].push(hops(d0, 15, 8).map(v => String(v).padStart(2, '0')), .25);
+  units[1].push(hops(d0, LAUNCH.getDate(), 8).map(v => String(v).padStart(2, '0')), .25);
   units[0].push(ms.map(i => MONTHS[i]), .12);
 }
 function wallCopy() {}                                                     // the comp's own subheader is a wall sprite now
@@ -614,6 +615,10 @@ addEventListener('keydown', ev => { if (modalOpen || ev.target.closest?.('input,
 const tog = (id, k) => { const b = document.getElementById(id); b.addEventListener('click', () => { S[k] = S[k] ? 0 : 1; b.setAttribute('aria-pressed', !!S[k]); }); };
 
 const back = document.getElementById('back'), wallcard = document.getElementById('wallcard');
+// "Be Part of" card: tears open from its corner once the scene has loaded, and tears shut again (scrubbing
+// with the scroll) before the tilt starts, instead of fading while the news form shows through it.
+const paintCard = crumpleReveal(wallcard, { origin: 'bottom-right' });
+let cardIn = 0; paintCard(0);
 document.getElementById('scrollDown').addEventListener('click', () => goTo(1));
 back.addEventListener('click', () => goTo(0));
 const lampBtn = document.getElementById('lampBtn');           // keyboard stand-in for clicking the lamp shade
@@ -717,7 +722,8 @@ function frame() {
   const onDesk = viewT > .95; if (lampBtn.hidden === onDesk) lampBtn.hidden = !onDesk;
   const pressed = String(lampOn); if (lampBtn.getAttribute('aria-pressed') !== pressed) lampBtn.setAttribute('aria-pressed', pressed);
   for (const m of steam) { m.material.uniforms.uOn.value = THREE.MathUtils.smoothstep(viewT, .6, 1); m.position.z = m.userData.z * THREE.MathUtils.smoothstep(viewT, .35, .95); }
-  wallcard.classList.toggle('gone', viewT > .06);
+  if (started) cardIn = reduce ? 1 : Math.min(1, cardIn + dt / .8);                   // on-load open, once
+  paintCard(Math.min(cardIn, 1 - THREE.MathUtils.clamp((sm - .03) / (.11 - .03), 0, 1)));
   renderer.setRenderTarget(rt); renderer.render(scene, camera);
   renderer.setRenderTarget(null); renderer.render(postScene, postCam);
   requestAnimationFrame(frame);

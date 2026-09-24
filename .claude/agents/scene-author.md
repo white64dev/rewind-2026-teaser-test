@@ -41,7 +41,7 @@ You place and time things. Read `.claude/agents/00-agent-roles-overview.md` and
   typewriter.
 - **Clock**: the comp's clock image is a wall sprite, and the flip cards are
   overlays shown only while they flip. It flips from the visitor's today to
-  JAN 15 2027. `hops()` caps the flips (year ≤5, month ≤7, day ≤8) so a large
+  JAN 07 2027. `hops()` caps the flips (year ≤5, month ≤7, day ≤8) so a large
   gap is still short. Clicking the clock replays it.
 - **Input**:
   - Wheel/scroll drives `scrollP`, and drag/swipe drives it with inertia. A

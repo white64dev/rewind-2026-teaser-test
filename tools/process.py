@@ -140,8 +140,8 @@ e=build('wall_bg',wb,1.0,-66,0,1859,1038,0,1,0,1.2,.05,10,0,1,maxside=4000,bake_
 ws=np.array(Image.open(R+'/wall_sign.png').convert('RGBA'))
 ws=ws[380:720, 90:1995]  # crop to letters+shadow (1x export)
 man['wall'].append(build('wall_sign',ws,1.0,-189+90,-54+380,1905,340,30,3,2.5,1.4,.35,35,.55,.3,maxside=4000))
-# wall copy + clock straight from the comp (3x exports → 2x textures), printed flat on the wall
-for nm,src,x,y,w,h in [('wall_copy','wall_subheader.png',447,615,381,153),('wall_clock','wall_clock3x.png',799.1,615,564,423)]:
+# wall copy + clock straight from the comp (resized to 2x textures), printed flat on the wall
+for nm,src,x,y,w,h in [('wall_copy','wall_subheader.png',447,615,381,153),('wall_clock','clock_v2.png',799.1,615,564,423)]:
     im=Image.open(R+'/parts/'+src).convert('RGBA'); im=im.resize((round(w*2),round(h*2)),Image.LANCZOS)
     man['wall'].append(build(nm,np.array(im),2.0,x,y,w,h,0,1,0,0,0,10,0,1.0,flat=True))
 json.dump(man,open(str(ROOT/'public'/'assets'/'manifest.json'),'w'),indent=1)

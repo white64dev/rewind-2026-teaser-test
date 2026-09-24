@@ -91,6 +91,18 @@ Entry format:
   the old and new files and diffing the pixels.
 - **Prevent:** always keep `viewBox` when minifying UI SVGs.
 
+### Background `process.py` left textures half-written
+- **Area:** tooling
+- **Cause:** `process.py` was started in the background from the device shell.
+  The shell ends after each call, which killed the script mid-run, leaving
+  some `public/assets/*.webp` rewritten and one empty (0 bytes).
+- **Fix:** restored the damaged files with `git checkout`, then rebuilt only
+  the changed sprite with a small script that reuses `build()` from
+  `process.py`.
+- **Prevent:** never background long jobs in the device shell. For a
+  one-sprite change, rebuild that sprite alone. Check `git status` on
+  `public/assets/` afterwards.
+
 ## Git and GitHub
 
 ### Git breaks inside the mounted folder (`index.lock`, garbage objects)

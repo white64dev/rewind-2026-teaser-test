@@ -43,9 +43,8 @@
   #cta .msg{position:absolute;left:40px;top:166px;width:188px;margin:0;font:600 10.5px/1.25 Archivo,"Helvetica Neue",Arial,sans-serif;color:var(--err)}
   #wallcard{position:fixed;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 25px*var(--s));width:152px;height:200px;z-index:4;box-sizing:border-box;padding:20px;
     display:flex;flex-direction:column;justify-content:space-between;background:url(/assets/ui_paper.webp) center/cover;box-shadow:-6px 6px 18px rgba(40,24,14,.28);
-    transition:opacity .4s,visibility .4s}
-  #cta:hover ~ #wallcard, #cta:focus-within ~ #wallcard{z-index:2}
-  #wallcard.gone{opacity:0;visibility:hidden}
+}
+  #cta:hover ~ #wallcard:not(.anim), #cta:focus-within ~ #wallcard:not(.anim){z-index:2}
   #wallcard .t{display:block;width:112px;height:auto}
   .btn{font:800 12px/15px Archivo,"Helvetica Neue",Arial,sans-serif;color:var(--bronze);background:transparent;border:2px solid var(--bronze);border-radius:4px;
     height:28px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;white-space:nowrap}
