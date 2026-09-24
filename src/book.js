@@ -7,7 +7,8 @@
 import * as THREE from 'three';
 
 const PAGES = 28, SHEETS = PAGES / 2;
-const PAGE_W = 1, PAGE_H = 648 / 522, THICK = .004, SEG = 30;
+const PAGE_W = 1, PAGE_H = 648 / 522, THICK = .0025, SEG = 40;
+const GUTTER = .75, GUTTER_L = .15;               // open spread: pages rise out of the spine along a smooth curve (rad, page widths)
 const TURN = .9;                                     // seconds per page turn
 const src = n => `/manual/p${String(n).padStart(2, '0')}.webp`;
 
@@ -50,20 +51,24 @@ export function createBook({ root, canvas, reduce, onPage }) {
     mesh.add(bones[0]); mesh.bind(new THREE.Skeleton(bones));
     mesh.frustumCulled = false;
     book.add(mesh);
-    const z = (SHEETS - s) * THICK; mesh.position.z = z;
+    const z = -s * THICK; mesh.position.z = z;
     sheets.push({ mesh, bones, a: 0, t0: 0, from: 0, to: 0, z0: z, z1: z, flips: false });
   }
 
-  let spread = 0, target = 0, open = false, t = 0;   // spread k: sheets 0..k-1 have turned
-  const angleFor = (s, k) => (s < k ? -Math.PI + s * .004 : s * .004);    // both stacks fan a hair, top sheet nearest: no z-fighting
+  let spread = 0, target = 0, open = false, t = 0, gOpen = 0;   // spread k: sheets 0..k-1 have turned
+  // Both piles are measured from their top sheet, which sits at z = 0 and lies exactly flat (0 or −π),
+  // so the two visible pages meet the spine at the same depth and their outer edges line up.
+  // Sheets underneath step back and fan a hair away from the camera: no z-fighting.
+  const angleFor = (s, k) => (s < k ? -Math.PI - (k - 1 - s) * .002 : (s - k) * .002);
+  const zFor = (s, k) => -(s < k ? k - 1 - s : s - k) * THICK;
   const ease = x => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
   function setSpread(k) {
     k = Math.max(0, Math.min(SHEETS, k));
     if (k === target) return;
     target = k;
     sheets.forEach((sh, s) => {
-      const to = angleFor(s, k), z1 = s < k ? s * THICK : (SHEETS - s) * THICK;   // turned pile: last turned on top
-      if (Math.abs(to - sh.to) < 1e-6) return;
+      const to = angleFor(s, k), z1 = zFor(s, k);
+      if (Math.abs(to - sh.to) < 1e-6 && Math.abs(z1 - sh.z1) < 1e-6) return;
       sh.flips = Math.abs(to - sh.to) > 1;
       // sheets that change sides turn one after another when jumping several spreads
       const order = !sh.flips ? 0 : k > spread ? s - spread : spread - 1 - s;
@@ -97,16 +102,25 @@ export function createBook({ root, canvas, reduce, onPage }) {
       if (k < 1) flying = true;
       const cover = s === 0 || s === SHEETS - 1, curl = (cover ? .15 : .55) * mid;
       // root takes the turn, the chain carries a lagging curl that vanishes at both ends of the turn
-      sh.bones[0].rotation.y = sh.a;
-      for (let b = 1; b < sh.bones.length; b++) sh.bones[b].rotation.y = curl * Math.sign(sh.to - sh.from) * -Math.sin((b / SEG) * Math.PI) * (2.2 / SEG);
+      // gutter: the slope starts at GUTTER out of the spine and eases to flat (cos(a) mirrors it for left pages,
+      // and it fades out while a sheet stands up in flight); the flight curl lags the tip behind the root
+      const g = GUTTER * gOpen * Math.cos(sh.a), dir = Math.sign(sh.to - sh.from);
+      let prev = 0;
+      for (let b = 0; b < sh.bones.length; b++) {
+        const u = b / SEG, slope = -g * Math.exp(-u / GUTTER_L);
+        const lag = curl * dir * -Math.sin(u * Math.PI) * (2.2 / SEG);
+        sh.bones[b].rotation.y = (b ? 0 : sh.a) + slope - prev + (b ? lag : 0);
+        prev = slope;
+      }
       // stacking: each pile keeps its top sheet nearest; a sheet in flight lifts clear of both
       sh.mesh.position.z = sh.z0 + (sh.z1 - sh.z0) * ease(k) + mid * .06;
     }
     // closed on the cover: the book sits right of the spine; closed on the back: left; open: centred
+    gOpen += ((spread > 0 && spread < SHEETS ? 1 : 0) - gOpen) * (reduce ? 1 : 1 - Math.pow(.02, dt));   // closed books lie flat
     const cx = spread === 0 ? -PAGE_W / 2 : spread === SHEETS ? PAGE_W / 2 : 0;
     book.position.x += (cx - book.position.x) * (reduce ? 1 : 1 - Math.pow(.02, dt));
     book.position.y = (1 - shown) * -1.2;
-    book.rotation.x = -.12 - (1 - shown) * .6;
+    book.rotation.x = -.3 - (1 - shown) * .5;                // tipped back a little, like a book held open: the gutter curve reads
     book.scale.setScalar(.75 + .25 * shown);
     renderer.render(scene, camera);
     if (open || shown > .005 || flying) raf = requestAnimationFrame(frame); else raf = 0;
