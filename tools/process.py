@@ -144,5 +144,10 @@ man['wall'].append(build('wall_sign',ws,1.0,-189+90,-54+380,1905,340,30,3,2.5,1.
 for nm,src,x,y,w,h in [('wall_copy','wall_subheader.png',447,615,381,153),('wall_clock','clock_v2.png',799.1,615,564,423)]:
     im=Image.open(R+'/parts/'+src).convert('RGBA'); im=im.resize((round(w*2),round(h*2)),Image.LANCZOS)
     man['wall'].append(build(nm,np.array(im),2.0,x,y,w,h,0,1,0,0,0,10,0,1.0,flat=True))
+# lamp light: the comp's Shine and typewriter Glow, as Figma rendered them (blur, gradient, opacity baked).
+# Only their alpha is kept; main.js tints them #EDCB80 and blends them the way Figma does.
+for src,dst in [('d31_shine.png','light_shine.webp'),('d30_tw_glow.png','light_glow.webp')]:
+    a=Image.open(R+'/'+src).convert('RGBA').getchannel('A'); a=a.resize((a.width//2,a.height//2),Image.LANCZOS)
+    Image.merge('RGBA',[a,a,a,a]).save(str(ROOT/'public'/'assets'/dst),'WEBP',lossless=True)
 json.dump(man,open(str(ROOT/'public'/'assets'/'manifest.json'),'w'),indent=1)
 print('ok'); 

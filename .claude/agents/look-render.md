@@ -25,11 +25,11 @@ default. The typewriter paper must look flat, like the picture.
     edge.
   - Output goes through `#include <colorspace_fragment>`.
   - Ambient light is `uAmb = .76 + .21 · lampLevel`.
-- **Lamp** (`beam`): one continuous shader cone from the lamp head to the
-  sheet. It runs white at the lamp and yellow at the far end, its width goes
-  30 → 250, and the pool radius is 250. The triangle and the pool must stay
-  one shape. `renderOrder = tw.renderOrder - 1.5` keeps the typewriter and
-  sheet above it: they are the hero.
+- **Lamp**: the comp's own light layers, from `light_shine.webp` (Screen) and
+  `light_glow.webp` (Normal, behind the typewriter). Both are tinted
+  #EDCB80 and blended in sRGB terms through `srgbBlend()`. Nothing is drawn
+  over the typewriter or its sheet. `LAMP_FLICKER` (off) keeps the bulb
+  stutter, and `LAMP_KEY` (0) keeps the old sprite relight under the cone.
 - **Wall sun**: the comp's sun patch (`wall_sun.webp`) breathes, sways and
   flickers gently through `uSun`, `uTime` and `uSunLevel`, with dust motes
   inside it. Natural light, not a strobe.

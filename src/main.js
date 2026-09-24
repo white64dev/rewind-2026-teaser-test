@@ -315,30 +315,40 @@ desk.updateMatrixWorld(true); common.uFrame.value.copy(desk.matrixWorld).invert(
 for (const e of man.desk) addSprite(e, desk, common, 0);
 const copy = sprites.find(m => m.userData.name === 'd29_tw_copy'), sheet = sprites.find(m => m.userData.name === 'd33_sheet');
 const paper = [sheet, copy].filter(Boolean);
-/* lamp beam: one continuous cone from the shade to where it lands — white and tight at the lamp,
-   widening, warming to yellow and fading toward the pool at the target */
+/* lamp light = the comp's own two light layers, exported from Figma as rendered (blur, gradient and opacity baked):
+   - "Shine" #1468:442 (light_shine.webp): the wedge from the shade to the typewriter, #EDCB80, blend Screen.
+   - typewriter "Glow" #1037:589 (light_glow.webp): the halo behind the typewriter, #EDCB80, normal blend.
+   The comp also lays the Glow at .15 OVER the typewriter; here it goes behind it too, so the halo keeps its
+   strength without a haze on the hero.
+   Figma blends in sRGB; the render target blends in linear. srgbBlend() fits the sRGB-space result out = s + k·dst
+   with a per-pixel linear blend (src·1 + dst·alpha) that is exact at the desk's mid tones, so the light matches the comp. */
 const PIVOT = W(240, 372, 0), REST = W(858, 405, 0);
 const tw = sprites.find(m => m.userData.name === 'd28_typewriter'), lampS = sprites.find(m => m.userData.name === 'd32_lamp');
-const beamU = { uFrame: common.uFrame, uP: { value: new THREE.Vector2(PIVOT.x, PIVOT.y) }, uT: { value: new THREE.Vector2(REST.x, REST.y) },
-                uOp: { value: .6 }, uTime: wallU.uTime };
-const beam = new THREE.Mesh(new THREE.PlaneGeometry(3200, 1500), new THREE.ShaderMaterial({ uniforms: beamU, vertexShader: vert,
-  transparent: true, depthTest: false, depthWrite: false,
-  fragmentShader: `uniform vec2 uP, uT; uniform float uOp, uTime; varying vec2 vUv; varying vec3 vW;
-    void main(){
-      vec2 ax = uT - uP; float len = length(ax); vec2 d = ax / len;
-      vec2 P0 = uP + d * 48.;                                   // start at the rim of the shade
-      vec2 q = vW.xy - P0; float L = len - 48.;
-      float t = dot(q, d) / L, r = abs(q.x * d.y - q.y * d.x);
-      float w = mix(30., 250., clamp(t, 0., 1.15));             // cone widens toward the target
-      float along = smoothstep(-.02, .04, t) * mix(1., .5, clamp(t, 0., 1.)) * exp(-pow(max(t - 1., 0.), 2.) * 9.);
-      float beamI = along * exp(-pow(r / w, 2.) * 1.7);
-      float pool = .6 * exp(-dot(vW.xy - uT, vW.xy - uT) / (250. * 250.));   // soft landing, joined to the cone
-      float I = max(beamI, pool);
-      vec3 col = mix(vec3(1., .98, .93), vec3(.95, .80, .52), smoothstep(0., 1., clamp(t, 0., 1.)));
-      gl_FragColor = vec4(col, clamp(I, 0., 1.) * uOp);
-      #include <colorspace_fragment>
-    }` }));
-beam.position.set(FRAME_W / 2, -FRAME_H / 2, 0); beam.renderOrder = tw.renderOrder - 1.5; desk.add(beam);   // under the typewriter and its sheet: they stay the hero                             // “Be Part of Metro Rewind” sheet in the typewriter
+const LAMP_RGB = new THREE.Vector3(237 / 255, 203 / 255, 128 / 255);        // #EDCB80, sRGB as in the comp
+const SRGB_BLEND = `vec4 srgbBlend(vec3 s, vec3 k){                   // wanted, in sRGB: out = s + k * dst
+    vec3 f1 = pow(s + k * .35, vec3(2.2)), f2 = pow(s + k * .75, vec3(2.2));   // fit at dst = .35 and .75 (sRGB)
+    float d1 = .0994, d2 = .5313, B = clamp(dot((f2 - f1) / (d2 - d1), vec3(1. / 3.)), 0., 1.);
+    return vec4(max((f1 + f2) * .5 - B * (d1 + d2) * .5, 0.), B); }`;
+const LIN_BLEND = { blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.SrcAlphaFactor,
+  blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor };
+const lightVert = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`;
+// x, y, w, h in desk px: each export includes the 100 px its blur spills past the layer
+const lightLayer = (file, [x, y, w, h], frag, extra = {}) => {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.ShaderMaterial({
+    uniforms: { map: { value: loadTex(file, false) }, uCol: { value: LAMP_RGB }, uOp: { value: 0 } },
+    vertexShader: lightVert, fragmentShader: `uniform sampler2D map; uniform vec3 uCol; uniform float uOp; varying vec2 vUv; ${SRGB_BLEND}
+      void main(){ float a = texture2D(map, vUv).r * uOp; ${frag} }`,
+    transparent: true, depthTest: false, depthWrite: false, ...LIN_BLEND, ...extra }));
+  m.position.copy(W(x + w / 2, y + h / 2, 0)); desk.add(m); return m;
+};
+const beam = lightLayer('light_shine.webp', [108, 205.5, 912, 628],
+  'gl_FragColor = srgbBlend(uCol * a, 1. - uCol * a);');                 // Screen: s + dst·(1 − s)
+beam.renderOrder = tw.renderOrder - 1.5;                                 // under the typewriter and its sheet: they stay the hero
+const beamU = beam.material.uniforms;
+const glows = [1, .2].map((k, i) => {                                  // .75 (baked in the export) and .15 = .2 × .75
+  const g = lightLayer('light_glow.webp', [558, 222, 592, 633], `a *= ${k.toFixed(2)}; gl_FragColor = srgbBlend(uCol * a, vec3(1. - a));`);   // Normal: a·c + dst·(1 − a)
+  g.renderOrder = tw.renderOrder - .5 + i * .1; return g;               // behind the typewriter, over everything under it
+});
 /* coffee steam: two soft, curling wisp layers rising off the cup toward the camera */
 const STEAM_C = W(1068, 596, 0);
 const steamMat = (seed, scale, speed, op) => new THREE.ShaderMaterial({
@@ -417,6 +427,8 @@ function scatter() {
 scatter();
 const easeOutBack = k => { const c = 1.4; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
 let arriveT = -1, lampOn = false, lampLevel = 0, flickUntil = 0;
+const LAMP_KEY = 0;            // extra relight of the sprites under the lamp cone (was .24); the comp has none
+const LAMP_FLICKER = false;   // bulb stutter on switch-on and the faint wobble while lit; off for now, flip to bring them back
 const easeOut = k => 1 - Math.pow(1 - k, 3);
 function placeMovers(k0) {
   for (const v of MOVERS) {
@@ -683,7 +695,7 @@ function frame() {
   const wl = wallU.uLight.value;
   // desk lamp light: rests over the typewriter, follows the cursor while the desk is in view
   const deskIn = viewT > .7 ? 1 : 0;
-  const flick = reduce ? 0 : Math.sin(t * 7.3) * .01 + Math.sin(t * 2.1) * .012, flickFx = flick * 2;
+  const flick = reduce || !LAMP_FLICKER ? 0 : Math.sin(t * 7.3) * .01 + Math.sin(t * 2.1) * .012, flickFx = flick * 2;
   // desk lamp: the light stays under the shade; the cursor swings where it points
   const LAMP = W(240, 372, 118), rest = W(858, 405, 0);     // desk-local; resting aim = the typewriter sheet
   let ax = rest.x, ay = rest.y;
@@ -697,9 +709,9 @@ function frame() {
   aim.x += (LAMP.x + _v.x - aim.x) * ease * .5; aim.y += (LAMP.y + _v.y - aim.y) * ease * .5;
   common.uLight.value.copy(LAMP);
   common.uSpotDir.value.set(aim.x - LAMP.x, aim.y - LAMP.y, -LAMP.z).normalize();
-  beamU.uT.value.set(aim.x, aim.y);
-  beamU.uOp.value = .85 * S.relight * lampLevel * (reduce ? 1 : 1 + flickFx);
-  common.uKey.value = (.24 + flick * 2) * lampLevel;
+  beamU.uOp.value = S.relight * lampLevel * (1 + flickFx);
+  for (const g of glows) g.material.uniforms.uOp.value = beamU.uOp.value;
+  common.uKey.value = (LAMP_KEY + flick * 2) * lampLevel;       // the comp lights the desk with Shine + Glow only
   common.uRelight.value = S.relight; common.uNormals.value = S.normals;
   updateShadows();
   for (const u of units) u.tick(dt);
@@ -715,9 +727,9 @@ function frame() {
   if (viewT < .2 && arriveT >= 0) resetType();
   typeTick(dt);
   // lamp level: off until the desk arrives; switching on stutters for a moment like a real bulb
-  const flickOn = t < flickUntil ? (Math.sin(t * 90) > .2 ? 1 : .15) : 1;
+  const flickOn = LAMP_FLICKER && t < flickUntil ? (Math.sin(t * 90) > .2 ? 1 : .15) : 1;
   lampLevel += ((lampOn ? flickOn : 0) - lampLevel) * (t < flickUntil ? 1 : 1 - Math.pow(.0001, dt));
-  common.uAmb.value = .76 + .21 * lampLevel;
+  common.uAmb.value = .76 + .24 * lampLevel;                    // lamp on = the comp's own exposure
   back.classList.toggle('show', viewT > .95);
   const onDesk = viewT > .95; if (lampBtn.hidden === onDesk) lampBtn.hidden = !onDesk;
   const pressed = String(lampOn); if (lampBtn.getAttribute('aria-pressed') !== pressed) lampBtn.setAttribute('aria-pressed', pressed);

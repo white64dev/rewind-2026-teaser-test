@@ -167,6 +167,25 @@ Entry format:
 - **Prevent:** never copy Figma opacity or blend numbers straight into a
   shader. Match visually.
 
+### Lamp light didn't match the comp (too pale, edges too soft or too hard)
+- **Area:** look
+- **Cause:**
+  - The beam was a hand-made cone, not the comp's own light layers.
+  - The render target blends in linear light, while Figma blends in sRGB,
+    so the same Screen or Normal layer came out paler.
+  - Figma's "blur 50" isn't a simple σ = 50. The rendered exports show the
+    Shine edge near σ 25 and the Glow near σ 50.
+- **Fix:**
+  - Use Figma's rendered exports of Shine (`d31_shine.png`) and the
+    typewriter Glow (`d30_tw_glow.png`) as alpha masks
+    (`light_*.webp`, built by `process.py`).
+  - `srgbBlend()` in `main.js` fits the sRGB-space result with a per-pixel
+    linear blend.
+  - Pixel checks against `ref_desk_v2.png` now land within a few levels on
+    the desk.
+- **Prevent:** match light to the comp's exported layers and measure patches
+  against the reference render. Don't eyeball or re-derive blur values.
+
 ### A gap between the chair and the desk
 - **Area:** scene
 - **Cause:** the chair's clip line and its travel did not meet the desk edge.
